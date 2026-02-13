@@ -1,0 +1,11 @@
+data/
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.env
+samples/
+ACE-Step-1.5/
+ModuLLe/
+DTgRPCconnector/
+Qwen3-TTS/
