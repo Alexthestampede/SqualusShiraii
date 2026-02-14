@@ -62,6 +62,7 @@ pip install --upgrade pip
 # Detect GPU and install PyTorch
 echo "Detecting GPU..."
 IS_ROCM=0
+IS_MACOS_ARM=0
 if command -v nvidia-smi &>/dev/null; then
     echo "NVIDIA detected - installing PyTorch for CUDA"
     pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu128
@@ -69,6 +70,11 @@ elif command -v rocm-smi &>/dev/null; then
     IS_ROCM=1
     echo "ROCm detected - installing PyTorch for ROCm"
     pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/rocm6.3
+elif [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
+    IS_MACOS_ARM=1
+    echo "Apple Silicon detected - installing PyTorch with MPS support"
+    # Default PyPI wheels include MPS; do NOT use --index-url .../cpu here
+    pip install torch torchaudio torchvision
 else
     echo "No GPU detected - installing CPU PyTorch"
     pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cpu
@@ -102,10 +108,11 @@ install_submodule() {
 NANO_VLLM="$ROOT/ACE-Step-1.5/acestep/third_parts/nano-vllm"
 if [ -d "$NANO_VLLM" ] && [ -n "$(ls -A "$NANO_VLLM" 2>/dev/null)" ]; then
     echo "Installing nano-vllm..."
-    if [ "$IS_ROCM" -eq 1 ]; then
-        # On ROCm: flash-attn wheels are CUDA-only. Skip it - SDPA fallback works.
+    if [ "$IS_ROCM" -eq 1 ] || [ "$IS_MACOS_ARM" -eq 1 ]; then
+        # ROCm/macOS: flash-attn wheels are CUDA-only. Skip it - SDPA fallback works.
         pip install --no-deps -e "$NANO_VLLM"
-        pip install xxhash transformers "triton>=3.0.0"
+        pip install xxhash transformers "triton>=3.0.0" 2>/dev/null || \
+            pip install xxhash transformers  # triton may not be available on macOS
     else
         pip install -e "$NANO_VLLM"
     fi
@@ -156,12 +163,24 @@ pip install grpcio flatbuffers Pillow
 echo "Installing app requirements..."
 pip install -r "$ROOT/requirements.txt"
 
-# ROCm cleanup: flash-attn ships CUDA-only binaries (libcudart.so.12).
-# It gets pulled in transitively by diffusers but is not needed -
-# PyTorch's built-in SDPA is used instead on ROCm.
+# Platform-specific cleanup and extras
 if [ "$IS_ROCM" -eq 1 ]; then
+    # flash-attn ships CUDA-only binaries (libcudart.so.12).
+    # It gets pulled in transitively by diffusers but is not needed -
+    # PyTorch's built-in SDPA is used instead on ROCm.
     echo "ROCm: removing CUDA-only flash-attn (SDPA fallback will be used)..."
     pip uninstall -y flash-attn 2>/dev/null || true
+fi
+
+if [ "$IS_MACOS_ARM" -eq 1 ]; then
+    echo "macOS: removing CUDA-only flash-attn..."
+    pip uninstall -y flash-attn 2>/dev/null || true
+
+    # MLX provides native Apple Silicon acceleration for ACE-Step's
+    # DiT decoder, VAE, and 5Hz LM. Pin mlx-lm<0.30.6 to stay
+    # compatible with the transformers<4.58.0 constraint.
+    echo "Installing MLX for Apple Silicon acceleration..."
+    pip install "mlx>=0.25.2" "mlx-lm>=0.20.0,<0.30.6"
 fi
 
 # Download ACE-Step models
