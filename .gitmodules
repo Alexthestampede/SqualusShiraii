@@ -1,0 +1,12 @@
+[submodule "ACE-Step-1.5"]
+	path = ACE-Step-1.5
+	url = https://github.com/ace-step/ACE-Step-1.5.git
+[submodule "ModuLLe"]
+	path = ModuLLe
+	url = https://github.com/Alexthestampede/ModuLLe.git
+[submodule "Qwen3-TTS"]
+	path = Qwen3-TTS
+	url = https://github.com/QwenLM/Qwen3-TTS.git
+[submodule "DTgRPCconnector"]
+	path = DTgRPCconnector
+	url = https://github.com/Alexthestampede/DTgRPCconnector.git

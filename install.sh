@@ -62,17 +62,33 @@ pip install --upgrade pip
 # Detect GPU and install PyTorch
 echo "Detecting GPU..."
 IS_ROCM=0
-if command -v rocm-smi &>/dev/null; then
+if command -v nvidia-smi &>/dev/null; then
+    echo "NVIDIA detected - installing PyTorch for CUDA"
+    pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu128
+elif command -v rocm-smi &>/dev/null; then
     IS_ROCM=1
     echo "ROCm detected - installing PyTorch for ROCm"
     pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/rocm6.3
-elif command -v nvidia-smi &>/dev/null; then
-    echo "NVIDIA detected - installing PyTorch for CUDA"
-    pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu128
 else
     echo "No GPU detected - installing CPU PyTorch"
     pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cpu
 fi
+
+# --------------------------------------------------------------------------
+# Helper: install a submodule only if the directory exists and has content.
+# Usage: install_submodule <name> <install_command>
+# --------------------------------------------------------------------------
+install_submodule() {
+    local name="$1"
+    shift
+    if [ -d "$ROOT/$name" ] && [ -n "$(ls -A "$ROOT/$name" 2>/dev/null)" ]; then
+        echo "Installing $name..."
+        "$@"
+    else
+        echo "WARNING: $name not found or empty. Skipping."
+        echo "  Run: git submodule update --init $name"
+    fi
+}
 
 # --------------------------------------------------------------------------
 # ACE-Step's pyproject.toml is written for `uv`, not `pip`:
@@ -83,18 +99,22 @@ fi
 # --------------------------------------------------------------------------
 
 # nano-vllm (ACE-Step bundled dependency)
-echo "Installing nano-vllm..."
-if [ "$IS_ROCM" -eq 1 ]; then
-    # On ROCm: flash-attn wheels are CUDA-only. Skip it - SDPA fallback works.
-    pip install --no-deps -e "$ROOT/ACE-Step-1.5/acestep/third_parts/nano-vllm"
-    pip install xxhash transformers "triton>=3.0.0"
+NANO_VLLM="$ROOT/ACE-Step-1.5/acestep/third_parts/nano-vllm"
+if [ -d "$NANO_VLLM" ] && [ -n "$(ls -A "$NANO_VLLM" 2>/dev/null)" ]; then
+    echo "Installing nano-vllm..."
+    if [ "$IS_ROCM" -eq 1 ]; then
+        # On ROCm: flash-attn wheels are CUDA-only. Skip it - SDPA fallback works.
+        pip install --no-deps -e "$NANO_VLLM"
+        pip install xxhash transformers "triton>=3.0.0"
+    else
+        pip install -e "$NANO_VLLM"
+    fi
 else
-    pip install -e "$ROOT/ACE-Step-1.5/acestep/third_parts/nano-vllm"
+    echo "WARNING: nano-vllm not found (ACE-Step-1.5 submodule missing?). Skipping."
 fi
 
 # ACE-Step itself (--no-deps to skip uv-only torch pins)
-echo "Installing ACE-Step..."
-pip install --no-deps -e "$ROOT/ACE-Step-1.5"
+install_submodule "ACE-Step-1.5" pip install --no-deps -e "$ROOT/ACE-Step-1.5"
 
 # ACE-Step's actual runtime deps (minus torch/nano-vllm, already installed)
 echo "Installing ACE-Step dependencies..."
@@ -124,8 +144,8 @@ pip install \
     "typer-slim>=0.21.1"
 
 echo "Installing remaining support libraries..."
-pip install -e "$ROOT/ModuLLe"
-pip install -e "$ROOT/Qwen3-TTS"
+install_submodule "ModuLLe" pip install -e "$ROOT/ModuLLe"
+install_submodule "Qwen3-TTS" pip install -e "$ROOT/Qwen3-TTS"
 
 # DTgRPCconnector is not a pip package (no setup.py/pyproject.toml).
 # It's imported at runtime via sys.path. Just install its dependencies.
