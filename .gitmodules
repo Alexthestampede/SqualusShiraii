@@ -1,6 +1,6 @@
 [submodule "ACE-Step-1.5"]
 	path = ACE-Step-1.5
-	url = https://github.com/ace-step/ACE-Step-1.5.git
+	url = https://github.com/Alexthestampede/ACE-Step-1.5.git
 [submodule "ModuLLe"]
 	path = ModuLLe
 	url = https://github.com/Alexthestampede/ModuLLe.git
