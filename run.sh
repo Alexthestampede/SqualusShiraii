@@ -12,6 +12,43 @@ else
     exit 1
 fi
 
+# --------------------------------------------------------------------------
+# ROCm environment setup (matches what start_*_rocm.bat does on Windows)
+# --------------------------------------------------------------------------
+if ! command -v nvidia-smi &>/dev/null && command -v rocm-smi &>/dev/null; then
+    echo "ROCm detected - configuring AMD GPU environment..."
+
+    # HSA_OVERRIDE_GFX_VERSION: required for consumer RDNA3 GPUs.
+    # Auto-detect from rocminfo if not already set.
+    if [ -z "${HSA_OVERRIDE_GFX_VERSION:-}" ]; then
+        GFX_TARGET=$(rocminfo 2>/dev/null | grep -oP 'gfx\d+' | head -1 || true)
+        case "$GFX_TARGET" in
+            gfx1100) export HSA_OVERRIDE_GFX_VERSION=11.0.0 ;;  # RX 7900 XT/XTX
+            gfx1101) export HSA_OVERRIDE_GFX_VERSION=11.0.1 ;;  # RX 7800 XT / 7700 XT
+            gfx1102) export HSA_OVERRIDE_GFX_VERSION=11.0.2 ;;  # RX 7600
+            gfx1150|gfx1151) export HSA_OVERRIDE_GFX_VERSION=11.0.0 ;;  # RDNA4
+            *)
+                echo "  NOTE: Unknown GFX target '$GFX_TARGET'. If GPU is not detected,"
+                echo "  set HSA_OVERRIDE_GFX_VERSION manually (see ACE-Step docs)."
+                ;;
+        esac
+        [ -n "${HSA_OVERRIDE_GFX_VERSION:-}" ] && \
+            echo "  HSA_OVERRIDE_GFX_VERSION=$HSA_OVERRIDE_GFX_VERSION (auto-detected from $GFX_TARGET)"
+    fi
+
+    # Force PyTorch LM backend - vllm/nano-vllm requires CUDA flash-attn
+    export ACESTEP_LM_BACKEND="${ACESTEP_LM_BACKEND:-pt}"
+
+    # Prevent first-run VAE decode hang (MIOpen exhaustive search)
+    export MIOPEN_FIND_MODE="${MIOPEN_FIND_MODE:-FAST}"
+
+    # Avoid HuggingFace tokenizer fork warnings
+    export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
+
+    echo "  ACESTEP_LM_BACKEND=$ACESTEP_LM_BACKEND"
+    echo "  MIOPEN_FIND_MODE=$MIOPEN_FIND_MODE"
+fi
+
 ACESTEP_PID=""
 APP_PID=""
 
