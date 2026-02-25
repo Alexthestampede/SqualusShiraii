@@ -59,7 +59,11 @@ export const api = {
 
   // TTS
   ttsClone: (data) => request('POST', '/api/tts/clone', data),
+  ttsCloneUpload: (formData) => uploadForm('POST', '/api/tts/clone-upload', formData),
   ttsDesign: (data) => request('POST', '/api/tts/design', data),
+  ttsCustomVoice: (data) => request('POST', '/api/tts/custom-voice', data),
+  ttsSpeakers: () => request('GET', '/api/tts/speakers'),
+  ttsAudioUrl: (filename) => '/api/tts/audio/' + encodeURIComponent(filename),
 
   // Jobs
   getJob: (id) => request('GET', `/api/jobs/${id}`),

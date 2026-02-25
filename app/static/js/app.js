@@ -6,6 +6,7 @@ import { renderCreateCustom } from './pages/create-custom.js';
 import { renderSongDetail } from './pages/song-detail.js';
 import { renderPersonas, renderPersonaDetail } from './pages/personas.js';
 import { renderSettings } from './pages/settings.js';
+import { renderTTS } from './pages/tts.js';
 
 const navEl = document.getElementById('nav');
 const pageEl = document.getElementById('page');
@@ -23,6 +24,7 @@ const routes = [
   { pattern: /^#\/song\/(\d+)$/, render: (m) => renderSongDetail(pageEl, parseInt(m[1])) },
   { pattern: /^#\/personas\/(\d+)$/, render: (m) => renderPersonaDetail(pageEl, parseInt(m[1])) },
   { pattern: /^#\/personas$/, render: () => renderPersonas(pageEl) },
+  { pattern: /^#\/tts$/, render: () => renderTTS(pageEl) },
   { pattern: /^#\/settings$/, render: () => renderSettings(pageEl) },
 ];
 

@@ -107,6 +107,20 @@ export async function renderSettings(container) {
     </div>
 
     <div class="section">
+      <div class="section-title">Text-to-Speech (Qwen3)</div>
+      <div class="card" style="padding: 16px;">
+        <div class="form-group">
+          <label class="form-label">Model Size</label>
+          <select class="form-select" id="set-tts-size">
+            <option value="0.6B" ${settings.tts_model_size === '1.7B' ? '' : 'selected'}>0.6B (Faster, less VRAM)</option>
+            <option value="1.7B" ${settings.tts_model_size === '1.7B' ? 'selected' : ''}>1.7B (Higher quality)</option>
+          </select>
+          <span class="text-sm text-muted">Voice Design mode always uses 1.7B (only size available).</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
       <div class="section-title">General</div>
       <div class="card" style="padding: 16px;">
         <div class="form-group">
@@ -261,6 +275,7 @@ export async function renderSettings(container) {
       grpc_width: document.getElementById('set-grpc-width').value,
       grpc_height: document.getElementById('set-grpc-height').value,
       acestep_url: document.getElementById('set-acestep-url').value.trim(),
+      tts_model_size: document.getElementById('set-tts-size').value,
       default_artist: document.getElementById('set-artist').value.trim(),
     };
 
