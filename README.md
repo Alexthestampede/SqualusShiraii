@@ -1,6 +1,8 @@
-# Squalus Shiraii
+# Squalus Shiraii 🦈
 
 A web interface that brings ACE Step to a nicer UI, enhances it with support for external LLMs for lyrics generation, and adds cover art generation using Draw Things' gRPC server.
+
+![Screenshot](SqualusShiraiiScreenshot.png)
 
 ## Features
 
