@@ -5,6 +5,7 @@ __pycache__/
 *.egg-info/
 .env
 samples/
+!samples/LyricsGenPrompt.txt
 AGENTS.md
 
 ACE-Step-1.5/
