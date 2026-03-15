@@ -4,7 +4,7 @@ __pycache__/
 .venv/
 *.egg-info/
 .env
-samples/
+samples/*
 !samples/LyricsGenPrompt.txt
 AGENTS.md
 
