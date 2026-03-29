@@ -62,13 +62,14 @@ async def list_llm_models():
 def _readable_model_name(filename: str) -> str:
     """Turn a Draw Things filename into a human-readable name."""
     import re
+
     name = filename
     # Strip extension
-    name = re.sub(r'\.(ckpt|safetensors|bin)$', '', name)
+    name = re.sub(r"\.(ckpt|safetensors|bin)$", "", name)
     # Strip quantisation suffixes
-    name = re.sub(r'_(?:q[0-9]+p(?:_q[0-9]+p)?|f16|f32)$', '', name)
+    name = re.sub(r"_(?:q[0-9]+p(?:_q[0-9]+p)?|f16|f32)$", "", name)
     # Replace underscores with spaces
-    name = name.replace('_', ' ')
+    name = name.replace("_", " ")
     # Capitalise first letter of each word
     name = name.title()
     return name
@@ -77,18 +78,18 @@ def _readable_model_name(filename: str) -> str:
 def _categorise_file(filename: str) -> str | None:
     """Return 'model', 'lora', 'vae', 'clip', 'ti', or None."""
     fl = filename.lower()
-    if '_lora_' in fl:
-        return 'lora'
-    if '_vae_' in fl or fl.startswith('vae'):
-        return 'vae'
-    if '_clip_' in fl:
-        return 'clip'
-    if '_ti_' in fl:
-        return 'ti'
+    if "_lora_" in fl:
+        return "lora"
+    if "_vae_" in fl or fl.startswith("vae"):
+        return "vae"
+    if "_clip_" in fl:
+        return "clip"
+    if "_ti_" in fl:
+        return "ti"
     # Skip known non-model patterns
-    if fl.startswith('blip') or fl.startswith('controlnet'):
+    if fl.startswith("blip") or fl.startswith("controlnet"):
         return None
-    return 'model'
+    return "model"
 
 
 @router.get("/grpc/models")
@@ -109,9 +110,9 @@ async def list_grpc_models():
             for f in sorted(reply.files):
                 cat = _categorise_file(f)
                 entry = {"file": f, "name": _readable_model_name(f)}
-                if cat == 'model':
+                if cat == "model":
                     models.append(entry)
-                elif cat == 'lora':
+                elif cat == "lora":
                     loras.append(entry)
             return {
                 "connected": True,
@@ -120,5 +121,103 @@ async def list_grpc_models():
                 "loras": loras,
             }
 
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@router.get("/updates/check")
+async def check_for_updates():
+    """Check if there are updates available from the remote git repository."""
+    import subprocess
+    import os
+
+    try:
+        repo_dir = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+
+        result = subprocess.run(
+            ["git", "fetch", "origin"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return {"error": f"Git fetch failed: {result.stderr}"}
+
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        local_commit = result.stdout.strip()
+
+        result = subprocess.run(
+            ["git", "rev-parse", "origin/master"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        remote_commit = result.stdout.strip()
+
+        if local_commit == remote_commit:
+            return {"up_to_date": True, "message": "Already up to date"}
+
+        result = subprocess.run(
+            ["git", "log", "--oneline", f"{local_commit}..{remote_commit}"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        commits = [line for line in result.stdout.strip().split("\n") if line]
+
+        return {
+            "up_to_date": False,
+            "local_commit": local_commit[:7],
+            "remote_commit": remote_commit[:7],
+            "commits_behind": len(commits),
+            "commits": commits[:10],
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Git command timed out"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@router.post("/updates/pull")
+async def pull_updates():
+    """Pull updates from the remote git repository."""
+    import subprocess
+    import os
+
+    try:
+        repo_dir = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+
+        result = subprocess.run(
+            ["git", "pull", "--ff-only"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            return {"error": f"Git pull failed: {result.stderr}"}
+
+        return {
+            "success": True,
+            "output": result.stdout,
+            "message": "Update successful. A restart may be required for changes to take effect.",
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Git pull timed out"}
     except Exception as e:
         return {"error": str(e)}

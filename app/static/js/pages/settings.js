@@ -131,6 +131,21 @@ export async function renderSettings(container) {
       </div>
     </div>
 
+    <div class="section">
+      <div class="section-title">Updates</div>
+      <div class="card" style="padding: 16px;">
+        <div class="flex gap-3 align-center">
+          <button class="btn btn-secondary" id="set-check-updates">Check for Updates</button>
+          <span id="set-update-status" class="text-sm text-muted"></span>
+        </div>
+        <div id="set-update-details" class="mt-3 hidden">
+          <p class="text-sm mb-2"><strong>Commits behind:</strong> <span id="set-commits-count"></span></p>
+          <ul class="text-sm text-muted" id="set-commits-list" style="max-height: 200px; overflow-y: auto;"></ul>
+          <button class="btn btn-primary mt-3" id="set-pull-updates">Update Now</button>
+        </div>
+      </div>
+    </div>
+
     <button class="btn btn-primary btn-lg w-full mt-4" id="set-save">Save Settings</button>
   `;
 
@@ -284,6 +299,65 @@ export async function renderSettings(container) {
       toast('Settings saved', 'success');
     } catch (e) {
       toast('Failed to save settings', 'error');
+    }
+  });
+
+  // Update check functionality
+  const checkUpdatesBtn = document.getElementById('set-check-updates');
+  const updateStatus = document.getElementById('set-update-status');
+  const updateDetails = document.getElementById('set-update-details');
+  const commitsCount = document.getElementById('set-commits-count');
+  const commitsList = document.getElementById('set-commits-list');
+  const pullUpdatesBtn = document.getElementById('set-pull-updates');
+
+  checkUpdatesBtn.addEventListener('click', async () => {
+    checkUpdatesBtn.disabled = true;
+    checkUpdatesBtn.textContent = 'Checking...';
+    updateStatus.textContent = '';
+    updateDetails.classList.add('hidden');
+
+    try {
+      const result = await api.checkUpdates();
+      if (result.error) {
+        updateStatus.textContent = 'Error: ' + result.error;
+        toast('Failed to check for updates', 'error');
+      } else if (result.up_to_date) {
+        updateStatus.textContent = '✓ Up to date';
+        toast('You are running the latest version', 'success');
+      } else {
+        updateStatus.textContent = `Update available (${result.commits_behind} commit${result.commits_behind !== 1 ? 's' : ''})`;
+        commitsCount.textContent = result.commits_behind;
+        commitsList.innerHTML = result.commits.map(c => `<li>${c}</li>`).join('');
+        updateDetails.classList.remove('hidden');
+        toast('Update available', 'info');
+      }
+    } catch (e) {
+      updateStatus.textContent = 'Error checking for updates';
+      toast('Failed to check for updates', 'error');
+    } finally {
+      checkUpdatesBtn.disabled = false;
+      checkUpdatesBtn.textContent = 'Check for Updates';
+    }
+  });
+
+  pullUpdatesBtn.addEventListener('click', async () => {
+    pullUpdatesBtn.disabled = true;
+    pullUpdatesBtn.textContent = 'Updating...';
+
+    try {
+      const result = await api.pullUpdates();
+      if (result.error) {
+        toast('Update failed: ' + result.error, 'error');
+      } else {
+        toast(result.message, 'success');
+        updateDetails.classList.add('hidden');
+        updateStatus.textContent = '✓ Updated';
+      }
+    } catch (e) {
+      toast('Update failed', 'error');
+    } finally {
+      pullUpdatesBtn.disabled = false;
+      pullUpdatesBtn.textContent = 'Update Now';
     }
   });
 }

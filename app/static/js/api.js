@@ -74,4 +74,6 @@ export const api = {
   updateSettings: (data) => request('PUT', '/api/settings', data),
   getLlmModels: () => request('GET', '/api/settings/llm/models'),
   getGrpcModels: () => request('GET', '/api/settings/grpc/models'),
+  checkUpdates: () => request('GET', '/api/settings/updates/check'),
+  pullUpdates: () => request('POST', '/api/settings/updates/pull'),
 };
