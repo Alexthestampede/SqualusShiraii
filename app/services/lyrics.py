@@ -1,8 +1,12 @@
 """Lyrics & prompt generation via ModuLLe."""
 
+import logging
+
 from app.config import LYRICS_PROMPT_PATH
 from app.database import async_session
 from app.models import Setting
+
+log = logging.getLogger(__name__)
 
 
 def _read_system_prompt() -> str:
@@ -69,7 +73,17 @@ async def generate_lyrics(description: str, instrumental: bool = False) -> dict:
     if not raw:
         return {"error": "LLM returned empty response"}
 
-    return _parse_llm_response(raw)
+    log.info("Raw LLM response:\n%s", raw)
+    parsed = _parse_llm_response(raw)
+    log.info(
+        "Parsed result: caption=%s, bpm=%s, duration=%s, key=%s, time_sig=%s",
+        parsed.get("caption"),
+        parsed.get("bpm"),
+        parsed.get("duration"),
+        parsed.get("key_scale"),
+        parsed.get("time_signature"),
+    )
+    return parsed
 
 
 def _parse_llm_response(raw: str) -> dict:
@@ -88,42 +102,46 @@ def _parse_llm_response(raw: str) -> dict:
     current_key = None
     current_lines = []
 
+    def _clean_header(text: str) -> str:
+        """Strip markdown formatting from section headers."""
+        return text.replace("**", "").replace("*", "").strip().lower()
+
     for line in raw.split("\n"):
         stripped = line.strip()
 
         # Detect section headers
-        lower = stripped.lower()
-        if lower.startswith("caption") or lower.startswith("**caption"):
+        cleaned = _clean_header(stripped)
+        if cleaned == "caption":
             if current_key:
                 sections[current_key] = "\n".join(current_lines).strip()
             current_key = "caption"
             current_lines = []
             continue
-        elif lower.startswith("lyrics") or lower.startswith("**lyrics"):
+        elif cleaned == "lyrics":
             if current_key:
                 sections[current_key] = "\n".join(current_lines).strip()
             current_key = "lyrics"
             current_lines = []
             continue
-        elif lower.startswith("beats per minute") or lower.startswith("**beats per minute"):
+        elif cleaned == "beats per minute":
             if current_key:
                 sections[current_key] = "\n".join(current_lines).strip()
             current_key = "bpm"
             current_lines = []
             continue
-        elif lower.startswith("duration") or lower.startswith("**duration"):
+        elif cleaned == "duration":
             if current_key:
                 sections[current_key] = "\n".join(current_lines).strip()
             current_key = "duration"
             current_lines = []
             continue
-        elif lower.startswith("timesignature") or lower.startswith("**timesignature"):
+        elif cleaned == "timesignature":
             if current_key:
                 sections[current_key] = "\n".join(current_lines).strip()
             current_key = "time_signature"
             current_lines = []
             continue
-        elif lower.startswith("keyscale") or lower.startswith("**keyscale"):
+        elif cleaned == "keyscale":
             if current_key:
                 sections[current_key] = "\n".join(current_lines).strip()
             current_key = "key_scale"
@@ -159,7 +177,9 @@ def _parse_llm_response(raw: str) -> dict:
             pass
     if "duration" in sections:
         try:
-            result["duration"] = float("".join(c for c in sections["duration"] if c.isdigit() or c == ".")[:6])
+            result["duration"] = float(
+                "".join(c for c in sections["duration"] if c.isdigit() or c == ".")[:6]
+            )
         except (ValueError, IndexError):
             pass
     if "time_signature" in sections:
@@ -228,7 +248,9 @@ async def generate_art_prompt(
             snippet += "..."
         parts.append(f"Lyrics excerpt:\n{snippet}")
 
-    user_prompt = "Write an album cover art prompt for this song:\n\n" + "\n".join(parts)
+    user_prompt = "Write an album cover art prompt for this song:\n\n" + "\n".join(
+        parts
+    )
 
     raw = text_processor.generate(
         prompt=user_prompt,
