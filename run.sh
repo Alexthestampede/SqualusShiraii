@@ -70,29 +70,39 @@ trap cleanup SIGINT SIGTERM EXIT
 YUE2_ENABLED="${YUE2_ENABLED:-1}"
 if [ "$YUE2_ENABLED" = "1" ]; then
     if [ -x "$ROOT/YuE2UI/.venv/bin/python" ]; then
-        echo "Starting YuE2 (YuE2UI) on :7860..."
-        (
-            cd "$ROOT/YuE2UI"
-            # MIOpen: skip per-shape kernel search on first use (identical output)
-            export MIOPEN_FIND_MODE="${MIOPEN_FIND_MODE:-FAST}"
-            setsid "$ROOT/YuE2UI/.venv/bin/python" server.py > "$ROOT/data/yue2.log" 2>&1 < /dev/null &
-            echo $! > "$ROOT/data/yue2.pid"
-        )
-        YUE2_PID="$(cat "$ROOT/data/yue2.pid")"
+        # Port must be free - a foreign/stray server on 7860 would silently
+        # impersonate YuE2 while our process fails to bind underneath it.
+        if curl -sf --max-time 2 http://127.0.0.1:7860/api/songs &>/dev/null; then
+            echo "WARNING: something is already listening on :7860 (foreign YuE2 server?)."
+            echo "  Not starting our own copy. Kill it first if unintended:"
+            PID_7860=$(ss -ltnp 2>/dev/null | grep -oP '(?<=pid=)\d+(?=.*7860)' | head -1)
+            [ -n "$PID_7860" ] && echo "  kill $PID_7860"
+            YUE2_PID=""
+        else
+            echo "Starting YuE2 (YuE2UI) on :7860..."
+            (
+                cd "$ROOT/YuE2UI"
+                # MIOpen: skip per-shape kernel search on first use (identical output)
+                export MIOPEN_FIND_MODE="${MIOPEN_FIND_MODE:-FAST}"
+                "$ROOT/YuE2UI/.venv/bin/python" server.py > "$ROOT/data/yue2.log" 2>&1 < /dev/null &
+                echo $! > "$ROOT/data/yue2.pid"
+            )
+            YUE2_PID="$(cat "$ROOT/data/yue2.pid")"
 
-        echo "Waiting for YuE2 API to be ready..."
-        for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:7860/api/songs &>/dev/null; then
-                echo "YuE2 ready."
-                break
-            fi
-            if ! kill -0 "$YUE2_PID" 2>/dev/null; then
-                echo "WARNING: YuE2 process died - see data/yue2.log (continuing without it)."
-                YUE2_PID=""
-                break
-            fi
-            sleep 2
-        done
+            echo "Waiting for YuE2 API to be ready..."
+            for i in $(seq 1 30); do
+                if curl -sf http://127.0.0.1:7860/api/songs &>/dev/null; then
+                    echo "YuE2 ready."
+                    break
+                fi
+                if ! kill -0 "$YUE2_PID" 2>/dev/null; then
+                    echo "WARNING: YuE2 process died - see data/yue2.log (continuing without it)."
+                    YUE2_PID=""
+                    break
+                fi
+                sleep 2
+            done
+        fi
     else
         echo "YuE2 not installed (./install.sh --with-yue2) - skipping. Continuing without it."
     fi
