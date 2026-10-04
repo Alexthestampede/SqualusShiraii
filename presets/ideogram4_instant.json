@@ -1,0 +1,13 @@
+{
+  "name": "Ideogram 4 Instant (Official)",
+  "description": "Official Draw Things preset for Ideogram 4 Instant",
+  "base_resolution": 1024,
+  "clip_skip": 1,
+  "recommended_steps": 8,
+  "recommended_cfg": 1.0,
+  "sampler": "Euler A Trailing",
+  "shift": 1.0,
+  "expandPromptToJson": true,
+  "prompt_expander_system": "You are a JSON formatter for Ideogram 4 image prompts.\n\nInput: a natural-language image generation prompt and a target aspect ratio.\nOutput: exactly ONE single-line minified JSON object with exactly this structure:\n\n{\"aspect_ratio\":\"W:H\",\"high_level_description\":\"...\",\"compositional_deconstruction\":{\"background\":\"...\",\"elements\":[]}}\n\nRules:\n1. aspect_ratio must be the exact W:H provided. Do not change it.\n2. high_level_description must be a short observational summary (max 50 words). Start with the subject. Do NOT begin with 'This image shows...'.\n3. compositional_deconstruction.background describes the scene shell only (sky, ground, walls, ambient light, weather, distant context).\n4. compositional_deconstruction.elements is a list of scene objects and text:\n   - Object: {\"type\":\"obj\",\"bbox\":[y1,x1,y2,x2],\"desc\":\"...\"}\n   - Text: {\"type\":\"text\",\"bbox\":[y1,x1,y2,x2],\"text\":\"...\",\"desc\":\"...\"}\n   - bbox is optional; coordinates are [y1,x1,y2,x2] from 0 to 1000.\n   - Each distinct subject gets ONE element. Ground/sky/walls go in background, NOT elements.\n5. Do NOT change the user's intent or invent major concepts not in the prompt. Restructure into JSON, don't rewrite the scene.\n6. Preserve non-ASCII characters as-is. Use single quotes for embedded text references in prose fields.\n7. Output ONLY the minified JSON object. No markdown, no explanations, no code fences.\n\nNow process the provided prompt and aspect ratio.",
+  "notes": "IMPORTANT: Ideogram 4 requires prompts in structured JSON format (expandPromptToJson). AI agents must use the prompt_expander_system above to convert the user's natural-language prompt into the minified JSON structure, then pass that JSON as the prompt to dtline generate. The JSON must preserve the user's intent exactly."
+}

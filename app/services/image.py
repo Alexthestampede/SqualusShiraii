@@ -117,6 +117,38 @@ def list_presets() -> list[dict]:
     return presets
 
 
+_NEGATIVE_PROMPTS_DIR = PRESETS_DIR / "negative_prompts"
+
+
+def list_negative_prompts() -> list[dict]:
+    """List bundled negative prompt presets (from dtline)."""
+    out = []
+    if not _NEGATIVE_PROMPTS_DIR.exists():
+        return out
+    for f in sorted(_NEGATIVE_PROMPTS_DIR.glob("*.json")):
+        try:
+            data = json.loads(f.read_text())
+            out.append({
+                "name": data.get("name", f.stem),
+                "description": data.get("description", ""),
+                "negative_prompt": data.get("negative_prompt", ""),
+            })
+        except (json.JSONDecodeError, OSError):
+            continue
+    return out
+
+
+def get_prompt_expander(preset_name: str) -> str:
+    """Return the prompt-expander system prompt for a preset, if any.
+
+    Ernie and Ideogram 4 need their input prompts pre-expanded by an LLM.
+    """
+    preset = _load_preset(preset_name)
+    if not preset:
+        return ""
+    return preset.get("prompt_expander_system", "")
+
+
 async def generate_art(
     prompt: str,
     output_path: str | Path,
@@ -167,20 +199,26 @@ async def generate_art(
 
     # Build config from preset or defaults
     if preset:
-        config = ImageGenerationConfig(
+        dtl = "recommended_steps" in preset  # dtline simplified schema
+        def steps_default() -> int:
+            return preset.get("recommended_steps", preset.get("steps", 16))
+        def cfg_default() -> float:
+            return preset.get("recommended_cfg", preset.get("guidanceScale", 5.0))
+        sampler_val = preset.get("sampler", 10)
+        config_kwargs = dict(
             model=resolved_model,
-            steps=preset.get("steps", 16),
+            steps=steps_default(),
             width=width,
             height=height,
-            cfg_scale=preset.get("guidanceScale", 5.0),
-            scheduler=_sampler_to_name(preset.get("sampler", 10)),
+            cfg_scale=cfg_default(),
+            scheduler=_sampler_to_name(sampler_val),
             seed_mode=preset.get("seedMode", 2),
             clip_skip=preset.get("clip_skip", 1),
             shift=preset.get("shift", 1.0),
             sharpness=preset.get("sharpness", 0.0),
-            hires_fix=preset.get("hiresFix", False),
-            tiled_decoding=preset.get("tiledDecoding", False),
-            tiled_diffusion=preset.get("tiledDiffusion", False),
+            hires_fix=preset.get("hiresFix", preset.get("hires_fix", False)),
+            tiled_decoding=preset.get("tiledDecoding", preset.get("tiled_decoding", False)),
+            tiled_diffusion=preset.get("tiledDiffusion", preset.get("tiled_diffusion", False)),
             mask_blur=preset.get("maskBlur", 2.5),
             mask_blur_outset=preset.get("maskBlurOutset", 0),
             preserve_original_after_inpaint=preset.get("preserveOriginalAfterInpaint", True),
@@ -188,6 +226,18 @@ async def generate_art(
             cfg_zero_init_steps=preset.get("cfgZeroInitSteps", 0),
             tea_cache=preset.get("teaCache", False),
         )
+        ss_gamma = preset.get("stochastic_sampling_gamma")
+        if ss_gamma is not None:
+            config_kwargs["stochastic_sampling_gamma"] = float(ss_gamma)
+        rds = preset.get("resolutionDependentShift", preset.get("resolution_dependent_shift"))
+        if rds is not None:
+            config_kwargs["resolution_dependent_shift"] = bool(rds)
+        loras = preset.get("loras") or []
+        if loras and not dtl:
+            config_kwargs["loras"] = [
+                {"file": l["file"], "weight": float(l.get("weight", 1.0))} for l in loras
+            ]
+        config = ImageGenerationConfig(**config_kwargs)
     else:
         config = ImageGenerationConfig(
             model=resolved_model,

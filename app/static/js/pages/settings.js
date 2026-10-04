@@ -79,8 +79,13 @@ export async function renderSettings(container) {
         </div>
         <div class="form-group mb-4">
           <label class="form-label">Negative Prompt</label>
-          <input class="form-input" id="set-grpc-negative" value="${settings.grpc_negative_prompt || ''}"
-            placeholder="e.g. blurry, low quality, text, watermark">
+          <div class="flex gap-3">
+            <input class="form-input" id="set-grpc-negative" value="${settings.grpc_negative_prompt || ''}"
+              placeholder="e.g. blurry, low quality, text, watermark" style="flex:1;">
+            <select class="form-select" id="set-grpc-negative-preset" style="max-width: 220px;">
+              <option value="">Load preset...</option>
+            </select>
+          </div>
         </div>
         <div class="flex gap-3 mb-4" style="flex-wrap: wrap;">
           <div class="form-group" style="flex: 1; min-width: 100px;">
@@ -299,6 +304,25 @@ export async function renderSettings(container) {
     const v = await api.getVersion();
     document.getElementById('set-version').textContent = `Version: ${v.version}`;
   } catch (e) { /* version optional */ }
+
+  // Negative prompt presets - fill dropdown, click loads into the field
+  try {
+    const negs = await api.getNegativePrompts();
+    const negSelect = document.getElementById('set-grpc-negative-preset');
+    negs.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n.negative_prompt;
+      opt.textContent = n.name;
+      negSelect.appendChild(opt);
+    });
+    negSelect.addEventListener('change', () => {
+      if (negSelect.value !== '') {
+        document.getElementById('set-grpc-negative').value = negSelect.value;
+        toast('Negative prompt loaded - press Save Settings to keep it', 'info');
+        negSelect.value = '';
+      }
+    });
+  } catch (e) { /* negative prompts optional */ }
 
   // YuE2 connection test
   document.getElementById('set-yue2-connect').addEventListener('click', async () => {

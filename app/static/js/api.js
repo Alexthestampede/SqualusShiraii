@@ -48,6 +48,7 @@ export const api = {
   // Art
   generateArt: (data) => request('POST', '/api/art/generate', data),
   getPresets: () => request('GET', '/api/art/presets'),
+  getNegativePrompts: () => request('GET', '/api/art/negative-prompts'),
 
   // Personas
   getPersonas: () => request('GET', '/api/personas'),

@@ -1,0 +1,21 @@
+{
+  "name": "LTX 2.3 22B Distilled (Official)",
+  "description": "Official Draw Things preset for LTX 2.3 22B distilled video generation",
+  "base_resolution": 1280,
+  "clip_skip": 1,
+  "recommended_steps": 8,
+  "recommended_cfg": 1.0,
+  "sampler": "TCD Trailing",
+  "shift": 5.0,
+  "stochastic_sampling_gamma": 0.3,
+  "num_frames": 121,
+  "width": 1280,
+  "height": 768,
+  "hires_fix": true,
+  "hires_fix_start_width": 640,
+  "hires_fix_start_height": 384,
+  "hires_fix_strength": 0.7,
+  "compression_artifacts": "disabled",
+  "compression_artifacts_quality": 43.1,
+  "notes": "VIDEO MODEL: LTX 2.3 22B distilled 1.1 generates video with synchronized audio. Draw Things supports 9-257 frames (9 = 8+1, quick for testing; official default is 121). Fixed 25 fps output. Hires fix generates at 640x384 then upscales to 1280x768. Audio arrives as fpzip-compressed CCV tensor blobs. Use --num-frames to override frame count. Model: LTX-2.3 22B [distilled] 1.1 (6-bit)"
+}

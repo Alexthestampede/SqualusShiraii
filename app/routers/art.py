@@ -84,3 +84,15 @@ async def generate_art(body: dict, db: AsyncSession = Depends(get_db)):
 async def list_presets():
     """List available image generation presets."""
     return image_svc.list_presets()
+
+
+@router.get("/negative-prompts")
+async def list_negative_prompts():
+    """List bundled negative prompt presets."""
+    return image_svc.list_negative_prompts()
+
+
+@router.get("/presets/prompt-expander")
+async def get_prompt_expander(name: str):
+    """Get the prompt-expander system prompt for a preset (Ernie, Ideogram 4)."""
+    return {"name": name, "prompt_expander_system": image_svc.get_prompt_expander(name)}

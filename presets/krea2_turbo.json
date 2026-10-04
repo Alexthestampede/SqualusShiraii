@@ -1,0 +1,11 @@
+{
+  "name": "Krea 2 Turbo (Official)",
+  "description": "Official Draw Things preset for Krea 2 Turbo",
+  "base_resolution": 1024,
+  "clip_skip": 1,
+  "recommended_steps": 8,
+  "recommended_cfg": 1.0,
+  "sampler": "Euler A Trailing",
+  "shift": 3.0,
+  "notes": "Official DT settings: sampler=Euler A Trailing, shift=3.0, 8 steps, CFG 1.0"
+}
