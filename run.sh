@@ -50,17 +50,52 @@ if ! command -v nvidia-smi &>/dev/null && command -v rocm-smi &>/dev/null; then
 fi
 
 ACESTEP_PID=""
+YUE2_PID=""
 APP_PID=""
 
 cleanup() {
     echo ""
     echo "Shutting down..."
     [ -n "$APP_PID" ] && kill "$APP_PID" 2>/dev/null || true
+    [ -n "$YUE2_PID" ] && kill "$YUE2_PID" 2>/dev/null || true
     [ -n "$ACESTEP_PID" ] && kill "$ACESTEP_PID" 2>/dev/null || true
     wait 2>/dev/null
     echo "Done."
 }
 trap cleanup SIGINT SIGTERM EXIT
+
+# Optionally start YuE2 (YuE2UI) on :7860 - opt-in, it's a heavy GPU server
+# with its own Python 3.12 venv inside the submodule.
+YUE2_ENABLED="${YUE2_ENABLED:-0}"
+if [ "$YUE2_ENABLED" = "1" ]; then
+    if [ -x "$ROOT/YuE2UI/.venv/bin/python" ]; then
+        echo "Starting YuE2 (YuE2UI) on :7860..."
+        (
+            cd "$ROOT/YuE2UI"
+            # MIOpen: skip per-shape kernel search on first use (identical output)
+            export MIOPEN_FIND_MODE="${MIOPEN_FIND_MODE:-FAST}"
+            setsid "$ROOT/YuE2UI/.venv/bin/python" server.py > "$ROOT/data/yue2.log" 2>&1 < /dev/null &
+            echo $! > "$ROOT/data/yue2.pid"
+        )
+        YUE2_PID="$(cat "$ROOT/data/yue2.pid")"
+
+        echo "Waiting for YuE2 API to be ready..."
+        for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:7860/api/songs &>/dev/null; then
+                echo "YuE2 ready."
+                break
+            fi
+            if ! kill -0 "$YUE2_PID" 2>/dev/null; then
+                echo "WARNING: YuE2 process died - see data/yue2.log (continuing without it)."
+                YUE2_PID=""
+                break
+            fi
+            sleep 2
+        done
+    else
+        echo "WARNING: YuE2UI venv not found (./install.sh --with-yue2?). Continuing without YuE2."
+    fi
+fi
 
 # Start ACE-Step API on :8001
 echo "Starting ACE-Step API on :8001..."
@@ -90,6 +125,7 @@ echo ""
 echo "=== Squalus Shiraii 🦈 running ==="
 echo "  App:      http://localhost:8000"
 echo "  ACE-Step: http://localhost:8001"
+[ -n "$YUE2_PID" ] && echo "  YuE2:     http://localhost:7860"
 echo ""
 echo "Press Ctrl+C to stop."
 

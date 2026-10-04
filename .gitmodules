@@ -10,3 +10,6 @@
 [submodule "DTgRPCconnector"]
 	path = DTgRPCconnector
 	url = https://github.com/Alexthestampede/DTgRPCconnector.git
+[submodule "YuE2UI"]
+	path = YuE2UI
+	url = https://github.com/Alexthestampede/YuE2UI.git

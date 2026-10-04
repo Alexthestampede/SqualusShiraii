@@ -135,6 +135,13 @@ async def yue2_health():
     return {"connected": True, "url": await yue2_svc.get_yue2_url()}
 
 
+@router.get("/version")
+async def get_version():
+    """App version in yyyymmdd.v scheme."""
+    from app.config import __version__
+    return {"version": __version__}
+
+
 @router.get("/updates/check")
 async def check_for_updates():
     """Check if there are updates available from the remote git repository."""

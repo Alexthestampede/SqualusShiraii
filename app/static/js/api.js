@@ -77,4 +77,5 @@ export const api = {
   getGrpcModels: () => request('GET', '/api/settings/grpc/models'),
   checkUpdates: () => request('GET', '/api/settings/updates/check'),
   pullUpdates: () => request('POST', '/api/settings/updates/pull'),
+  getVersion: () => request('GET', '/api/settings/version'),
 };

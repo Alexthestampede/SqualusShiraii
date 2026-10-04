@@ -4,6 +4,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
+# Flags: --with-yue2 also installs YuE2 engine (needs uv + Python 3.12)
+WITH_YUE2=0
+for arg in "$@"; do
+    case "$arg" in
+        --with-yue2) WITH_YUE2=1 ;;
+        *) echo "Unknown flag: $arg (supported: --with-yue2)"; exit 1 ;;
+    esac
+done
+
 echo "=== Squalus Shiraii 🦈 Installer ==="
 
 # Check system deps
@@ -181,6 +190,21 @@ if [ "$IS_MACOS_ARM" -eq 1 ]; then
     # compatible with the transformers<4.58.0 constraint.
     echo "Installing MLX for Apple Silicon acceleration..."
     pip install "mlx>=0.25.2" "mlx-lm>=0.20.0,<0.30.6"
+fi
+
+# YuE2 engine (optional): YuE2UI needs Python 3.12 + uv and manages its own
+# venv inside the submodule; it also patches the upstream YuE clone at install
+# time (ROCm SDPA backend + NAR query chunking). Run its installer as-is.
+if [ "$WITH_YUE2" -eq 1 ]; then
+    if [ -f "$ROOT/YuE2UI/install.sh" ]; then
+        echo ""
+        echo "=== Installing YuE2 engine (--with-yue2) ==="
+        bash "$ROOT/YuE2UI/install.sh"
+    else
+        echo "WARNING: YuE2UI submodule missing. Run: git submodule update --init YuE2UI"
+    fi
+else
+    echo "Skipping YuE2 engine (pass --with-yue2 to install; it needs uv + Python 3.12)"
 fi
 
 # Download ACE-Step models

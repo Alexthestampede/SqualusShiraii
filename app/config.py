@@ -30,6 +30,9 @@ DEFAULT_ARTIST = os.environ.get("DEFAULT_ARTIST", "Squalus Shiraii")
 
 DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
 
+# Version scheme: yyyymmdd.v (v = update number within the day, starting at 1)
+__version__ = "20261004.1"
+
 # Ensure data directories exist
 for d in [DATA_DIR, AUDIO_DIR, ART_DIR, PORTRAITS_DIR, VOICES_DIR, EXPORTS_DIR]:
     d.mkdir(parents=True, exist_ok=True)

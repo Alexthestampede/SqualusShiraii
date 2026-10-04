@@ -150,6 +150,7 @@ export async function renderSettings(container) {
     <div class="section">
       <div class="section-title">Updates</div>
       <div class="card" style="padding: 16px;">
+        <p class="text-sm text-muted mb-3" id="set-version">Version: ...</p>
         <div class="flex gap-3 align-center">
           <button class="btn btn-secondary" id="set-check-updates">Check for Updates</button>
           <span id="set-update-status" class="text-sm text-muted"></span>
@@ -291,6 +292,12 @@ export async function renderSettings(container) {
       select.appendChild(opt);
     });
   } catch (e) { /* presets optional */ }
+
+  // Version display
+  try {
+    const v = await api.getVersion();
+    document.getElementById('set-version').textContent = `Version: ${v.version}`;
+  } catch (e) { /* version optional */ }
 
   // YuE2 connection test
   document.getElementById('set-yue2-connect').addEventListener('click', async () => {

@@ -7,6 +7,7 @@ A web interface that brings ACE Step to a nicer UI, enhances it with support for
 ## Features
 
 - **Web Interface** - Clean, user-friendly interface for ACE Step
+- **Multiple Music Engines** - Pick ACE-Step (fast) or YuE2 (high quality, via [YuE2UI](https://github.com/Alexthestampede/YuE2UI)) per song
 - **External LLM Support** - Connect to any LLM provider (Ollama, OpenAI, etc.) for lyrics generation
 - **Cover Art Generation** - Generate album artwork using Draw Things via gRPC
 - **Multi-Platform Support** - Linux, macOS, and Windows
