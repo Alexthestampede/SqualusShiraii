@@ -6,6 +6,7 @@ __pycache__/
 .env
 samples/*
 !samples/LyricsGenPrompt.txt
+!samples/YuE2.md
 AGENTS.md
 
 ACE-Step-1.5/
