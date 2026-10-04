@@ -8,14 +8,16 @@ from app.database import get_db, async_session
 from app.models import Song, Job
 from app.config import AUDIO_DIR
 from app.services import music as music_svc
+from app.services import yue2 as yue2_svc
 
 router = APIRouter()
 
 
 @router.post("/generate")
 async def generate_music(body: dict, bg: BackgroundTasks, db: AsyncSession = Depends(get_db)):
-    """Direct music generation - submit arbitrary params to ACE-Step."""
+    """Direct music generation - submit arbitrary params to the selected engine."""
     song_id = body.pop("song_id", None)
+    engine = body.pop("engine", "acestep")
 
     job = Job(
         id=str(uuid.uuid4()),
@@ -26,8 +28,68 @@ async def generate_music(body: dict, bg: BackgroundTasks, db: AsyncSession = Dep
     db.add(job)
     await db.commit()
 
+    if engine == "yue2":
+        if song_id:
+            song = await db.get(Song, song_id)
+            if song:
+                song.engine = "yue2"
+                await db.commit()
+        bg.add_task(_run_yue2_direct, job.id, song_id, body)
+        return {"job_id": job.id}
+
     bg.add_task(_run_music_job, job.id, song_id, body)
     return {"job_id": job.id}
+
+
+async def _run_yue2_direct(job_id: str, song_id: int | None, params: dict):
+    """Background: direct YuE2 generation with explicit style/lyrics."""
+    async with async_session() as db:
+        job = await db.get(Job, job_id)
+        try:
+            job.status = "running"
+            job.stage = "Submitting to YuE2..."
+            await db.commit()
+
+            async def on_progress(r):
+                job.progress = float(r.get("progress", 0))
+                job.stage = f"YuE2: {r.get('stage', '')}"
+                await db.commit()
+
+            final = await yue2_svc.run_generation(job_id, params, on_progress=on_progress)
+            result = final.get("result", {})
+
+            audio_bytes = await yue2_svc.download_audio(final["yue2_job_id"])
+            from pathlib import Path
+            local_name = f"{song_id or 'direct'}_{uuid.uuid4().hex[:8]}.flac"
+            local_path = AUDIO_DIR / local_name
+            local_path.write_bytes(audio_bytes)
+
+            if song_id:
+                song = await db.get(Song, song_id)
+                if song:
+                    song.audio_path = str(local_path)
+                    song.status = "completed"
+                    meta = yue2_svc.result_metadata(result)
+                    if meta.get("duration") and not song.duration:
+                        song.duration = meta["duration"]
+
+            job.result_json = json.dumps(
+                {"engine": "yue2", "yue2_job": final.get("yue2_job_id"), "seconds": result.get("seconds")}
+            )
+            job.status = "completed"
+            job.progress = 1.0
+            job.stage = "Done"
+            await db.commit()
+
+        except Exception as e:
+            job.status = "failed"
+            job.error = str(e)
+            await db.commit()
+            if song_id:
+                song = await db.get(Song, song_id)
+                if song:
+                    song.status = "failed"
+                    await db.commit()
 
 
 @router.post("/repaint")

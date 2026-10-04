@@ -8,6 +8,11 @@ const STYLE_TAGS = [
 ];
 
 export async function renderCreateSimple(container) {
+  let settings = {};
+  try {
+    settings = await api.getSettings();
+  } catch (e) { /* defaults fine */ }
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Create</h1>
@@ -30,6 +35,13 @@ export async function renderCreateSimple(container) {
     </div>
 
     <div class="section">
+      <div class="row">
+        <span class="row-label">Engine</span>
+        <select class="form-select" id="create-engine" style="max-width: 240px;">
+          <option value="acestep" ${settings.default_engine !== 'yue2' ? 'selected' : ''}>ACE-Step (fast)</option>
+          <option value="yue2" ${settings.default_engine === 'yue2' ? 'selected' : ''}>YuE2 (high quality, slow)</option>
+        </select>
+      </div>
       <div class="row">
         <span class="row-label">Instrumental</span>
         <label class="toggle">
@@ -75,6 +87,7 @@ export async function renderCreateSimple(container) {
       description,
       styles: [...selectedTags],
       instrumental: document.getElementById('create-instrumental').checked,
+      engine: document.getElementById('create-engine').value,
     };
 
     const btn = document.getElementById('create-btn');

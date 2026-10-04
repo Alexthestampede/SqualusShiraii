@@ -3,6 +3,11 @@ import { toast } from '../components/toast.js';
 import { renderLyricsEditor } from '../components/lyrics-editor.js';
 
 export async function renderCreateCustom(container) {
+  let settings = {};
+  try {
+    settings = await api.getSettings();
+  } catch (e) { /* defaults fine */ }
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Custom Create</h1>
@@ -24,6 +29,20 @@ export async function renderCreateCustom(container) {
         <textarea class="form-textarea" id="custom-caption" rows="3"
           placeholder="Indie rock, male raspy vocal, driving guitars, melancholic atmosphere..."></textarea>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Engine</div>
+      <div class="row">
+        <span class="row-label">Music Engine</span>
+        <select class="form-select" id="custom-engine" style="max-width: 280px;">
+          <option value="acestep" ${settings.default_engine !== 'yue2' ? 'selected' : ''}>ACE-Step (fast)</option>
+          <option value="yue2" ${settings.default_engine === 'yue2' ? 'selected' : ''}>YuE2 (high quality, slow)</option>
+        </select>
+      </div>
+      <span class="text-sm text-muted" id="engine-hint">
+        YuE2 ignores BPM/key/time-sig metadata and always renders vocals from lyrics. Preview render (~16 NAR steps) is used.
+      </span>
     </div>
 
     <div class="section">
@@ -145,6 +164,7 @@ export async function renderCreateCustom(container) {
       instrumental: document.getElementById('custom-instrumental').checked,
       persona_id: parseInt(document.getElementById('custom-persona').value) || null,
       voice_strength: parseInt(document.getElementById('custom-voice-strength').value) / 100,
+      engine: document.getElementById('custom-engine').value,
     };
 
     if (!data.lyrics && !data.caption) {

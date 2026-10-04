@@ -96,12 +96,28 @@ export async function renderSettings(container) {
     </div>
 
     <div class="section">
-      <div class="section-title">Music Generation (ACE-Step)</div>
+      <div class="section-title">Music Generation</div>
       <div class="card" style="padding: 16px;">
-        <div class="form-group">
-          <label class="form-label">API URL</label>
+        <div class="form-group mb-4">
+          <label class="form-label">Default Engine</label>
+          <select class="form-select" id="set-default-engine">
+            <option value="acestep" ${settings.default_engine !== 'yue2' ? 'selected' : ''}>ACE-Step</option>
+            <option value="yue2" ${settings.default_engine === 'yue2' ? 'selected' : ''}>YuE2</option>
+          </select>
+        </div>
+        <div class="form-group mb-4">
+          <label class="form-label">ACE-Step API URL</label>
           <input class="form-input" id="set-acestep-url" value="${settings.acestep_url || 'http://127.0.0.1:8001'}"
             placeholder="http://127.0.0.1:8001">
+        </div>
+        <div class="form-group">
+          <label class="form-label">YuE2 (YuE2UI) URL</label>
+          <div class="flex gap-3">
+            <input class="form-input" id="set-yue2-url" value="${settings.yue2_url || 'http://127.0.0.1:7860'}"
+              placeholder="http://127.0.0.1:7860" style="flex:1;">
+            <button class="btn btn-secondary" id="set-yue2-connect">Test</button>
+          </div>
+          <span class="text-sm text-muted" id="yue2-hint"></span>
         </div>
       </div>
     </div>
@@ -276,6 +292,34 @@ export async function renderSettings(container) {
     });
   } catch (e) { /* presets optional */ }
 
+  // YuE2 connection test
+  document.getElementById('set-yue2-connect').addEventListener('click', async () => {
+    const hint = document.getElementById('yue2-hint');
+    const btn = document.getElementById('set-yue2-connect');
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+    // Save URL first so the backend tests the value just entered
+    try {
+      await api.updateSettings({ yue2_url: document.getElementById('set-yue2-url').value.trim() });
+    } catch (e) { /* non-fatal, test will use saved value */ }
+    try {
+      const result = await api.checkYue2();
+      if (result.connected) {
+        hint.textContent = 'Connected to YuE2UI';
+        toast('YuE2UI reachable', 'success');
+      } else {
+        hint.textContent = 'Not reachable at ' + result.url;
+        toast('YuE2UI not reachable', 'error');
+      }
+    } catch (e) {
+      hint.textContent = 'Test failed';
+      toast('YuE2UI test failed', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Test';
+    }
+  });
+
   // Save
   document.getElementById('set-save').addEventListener('click', async () => {
     const data = {
@@ -290,6 +334,8 @@ export async function renderSettings(container) {
       grpc_width: document.getElementById('set-grpc-width').value,
       grpc_height: document.getElementById('set-grpc-height').value,
       acestep_url: document.getElementById('set-acestep-url').value.trim(),
+      yue2_url: document.getElementById('set-yue2-url').value.trim(),
+      default_engine: document.getElementById('set-default-engine').value,
       tts_model_size: document.getElementById('set-tts-size').value,
       default_artist: document.getElementById('set-artist').value.trim(),
     };

@@ -12,6 +12,7 @@ from app.database import get_db, async_session
 from app.models import Song, Job, Setting, Persona
 from app.config import AUDIO_DIR, DEFAULT_ARTIST
 from app.services import music as music_svc
+from app.services import yue2 as yue2_svc
 
 log = logging.getLogger(__name__)
 
@@ -122,11 +123,14 @@ async def _run_generation(job_id: str, song_id: int, ace_params: dict):
 
 @router.post("/simple")
 async def create_simple(body: dict, bg: BackgroundTasks, db: AsyncSession = Depends(get_db)):
-    """Simple creation: description + optional styles + instrumental toggle."""
+    """Simple creation: description + optional styles + instrumental + engine."""
     description = body.get("description", "").strip()
     styles = body.get("styles", [])
     instrumental = body.get("instrumental", False)
+    engine = body.get("engine", "acestep")
 
+    if engine not in ("acestep", "yue2"):
+        return {"error": f"Unknown engine: {engine}"}
     if not description:
         return {"error": "Description is required"}
 
@@ -137,12 +141,17 @@ async def create_simple(body: dict, bg: BackgroundTasks, db: AsyncSession = Depe
 
     artist = await _get_setting("default_artist", DEFAULT_ARTIST)
 
+    if engine == "yue2" and instrumental:
+        # YuE2 is vocal-driven; instrumental tracks are an ACE-Step feature
+        return {"error": "YuE2 does not support instrumental-only generation"}
+
     # Create song record
     song = Song(
         title=description[:60],
         artist=artist,
         caption=caption,
         instrumental=instrumental,
+        engine=engine,
         status="generating",
     )
     db.add(song)
@@ -157,6 +166,18 @@ async def create_simple(body: dict, bg: BackgroundTasks, db: AsyncSession = Depe
     )
     db.add(job)
     await db.commit()
+
+    if engine == "yue2":
+        yue_params = {
+            "style": caption,
+            "lyrics": lyrics,
+            "cot": "full",
+            "preview": True,
+        }
+        # Simple mode has no real lyrics - have the LLM write them first
+        yue_params["generate_lyrics_from"] = description if not lyrics else ""
+        bg.add_task(_run_yue2_generation, job.id, song.id, yue_params)
+        return {"job_id": job.id, "song_id": song.id}
 
     # Build ACE-Step params
     # Don't use sample_mode - it lets ACE-Step's LLM pick language/style freely.
@@ -185,7 +206,12 @@ async def create_custom(body: dict, bg: BackgroundTasks, db: AsyncSession = Depe
     caption = body.get("caption", "").strip()
     instrumental = body.get("instrumental", False)
     persona_id = body.get("persona_id")
+    engine = body.get("engine", "acestep")
 
+    if engine not in ("acestep", "yue2"):
+        return {"error": f"Unknown engine: {engine}"}
+    if engine == "yue2" and instrumental:
+        return {"error": "YuE2 does not support instrumental-only generation"}
     if not lyrics and not caption:
         return {"error": "Provide lyrics or a caption"}
 
@@ -215,6 +241,7 @@ async def create_custom(body: dict, bg: BackgroundTasks, db: AsyncSession = Depe
         vocal_language=body.get("vocal_language", "en"),
         instrumental=instrumental,
         persona_id=persona_id,
+        engine=engine,
         status="generating",
     )
     db.add(song)
@@ -228,6 +255,18 @@ async def create_custom(body: dict, bg: BackgroundTasks, db: AsyncSession = Depe
     )
     db.add(job)
     await db.commit()
+
+    if engine == "yue2":
+        yue_params = {
+            "style": effective_caption,
+            "lyrics": lyrics,
+            "cot": "full",
+            "preview": bool(body.get("preview", True)),
+        }
+        if song.seed is not None:
+            yue_params["seed"] = song.seed
+        bg.add_task(_run_yue2_generation, job.id, song.id, yue_params)
+        return {"job_id": job.id, "song_id": song.id}
 
     # Use more inference steps when reference audio is provided for better conditioning
     has_ref_audio = persona and persona.ref_audio_path and Path(persona.ref_audio_path).exists()
@@ -265,3 +304,77 @@ async def create_custom(body: dict, bg: BackgroundTasks, db: AsyncSession = Depe
     bg.add_task(_run_generation, job.id, song.id, ace_params)
 
     return {"job_id": job.id, "song_id": song.id}
+
+
+async def _run_yue2_generation(job_id: str, song_id: int, params: dict):
+    """Background: optionally LLM-write lyrics, submit to YuE2, poll, save result."""
+    async with async_session() as db:
+        job = await db.get(Job, job_id)
+        try:
+            job.status = "running"
+            job.stage = "Writing lyrics..." if params.get("generate_lyrics_from") else "Submitting to YuE2..."
+            await db.commit()
+
+            # Simple mode: generate lyrics first so YuE2 has something to sing
+            gen_from = params.pop("generate_lyrics_from", "")
+            if gen_from:
+                from app.services import lyrics as lyrics_svc
+
+                lyr = await lyrics_svc.generate_lyrics(gen_from)
+                if lyr.get("error") or not lyr.get("lyrics"):
+                    raise RuntimeError(f"Lyrics generation failed: {lyr.get('error', 'empty response')}")
+                params["lyrics"] = lyr["lyrics"]
+                if lyr.get("caption") and not params.get("style"):
+                    params["style"] = lyr["caption"]
+                # Persist what the LLM wrote
+                song = await db.get(Song, song_id)
+                if song:
+                    song.lyrics = lyr["lyrics"]
+                    if lyr.get("caption") and not song.caption:
+                        song.caption = lyr["caption"]
+                    await db.commit()
+                job.stage = "Submitting to YuE2..."
+                await db.commit()
+
+            async def on_progress(r):
+                job.progress = float(r.get("progress", 0))
+                job.stage = f"YuE2: {r.get('stage', '')}"
+                await db.commit()
+
+            final = await yue2_svc.run_generation(job_id, params, on_progress=on_progress)
+            result = final.get("result", {})
+
+            audio_bytes = await yue2_svc.download_audio(final["yue2_job_id"])
+
+            local_name = f"{song_id}_{uuid.uuid4().hex[:8]}.flac"
+            local_path = AUDIO_DIR / local_name
+            local_path.write_bytes(audio_bytes)
+
+            song = await db.get(Song, song_id)
+            if song:
+                song.audio_path = str(local_path)
+                song.status = "completed"
+                meta = yue2_svc.result_metadata(result)
+                if meta.get("duration") and not song.duration:
+                    song.duration = meta["duration"]
+                job.result_json = json.dumps(
+                    {"engine": "yue2", "yue2_job": final.get("yue2_job_id"),
+                     "seconds": result.get("seconds"), "timing": result.get("timing")}
+                )
+
+            job.status = "completed"
+            job.progress = 1.0
+            job.stage = "Done"
+            await db.commit()
+
+        except Exception as e:
+            log.exception("YuE2 job %s failed: %s", job_id, e)
+            job.status = "failed"
+            job.error = str(e)
+            job.stage = "Failed"
+            await db.commit()
+
+            song = await db.get(Song, song_id)
+            if song:
+                song.status = "failed"
+                await db.commit()

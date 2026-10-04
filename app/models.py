@@ -53,6 +53,7 @@ class Song(Base):
     vocal_language: Mapped[str] = mapped_column(String(8), default="en")
     instrumental: Mapped[bool] = mapped_column(Boolean, default=False)
     seed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    engine: Mapped[str] = mapped_column(String(32), default="acestep")
     audio_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     art_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     export_path: Mapped[str | None] = mapped_column(String(512), nullable=True)

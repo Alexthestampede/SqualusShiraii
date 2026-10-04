@@ -125,6 +125,16 @@ async def list_grpc_models():
         return {"error": str(e)}
 
 
+@router.get("/yue2/health")
+async def yue2_health():
+    """Check whether the YuE2UI server is reachable."""
+    from app.services import yue2 as yue2_svc
+    ok = await yue2_svc.health_check()
+    if not ok:
+        return {"connected": False, "url": await yue2_svc.get_yue2_url()}
+    return {"connected": True, "url": await yue2_svc.get_yue2_url()}
+
+
 @router.get("/updates/check")
 async def check_for_updates():
     """Check if there are updates available from the remote git repository."""

@@ -21,6 +21,7 @@ LYRICS_PROMPT_PATH = SAMPLES_DIR / "LyricsGenPrompt.txt"
 
 # Service defaults
 ACESTEP_URL = os.environ.get("ACESTEP_URL", "http://127.0.0.1:8001")
+YUE2_URL = os.environ.get("YUE2_URL", "http://127.0.0.1:7860")
 GRPC_SERVER = os.environ.get("GRPC_SERVER", "192.168.2.150:7859")
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama")
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://localhost:11434")
