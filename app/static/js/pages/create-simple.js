@@ -13,6 +13,18 @@ export async function renderCreateSimple(container) {
     settings = await api.getSettings();
   } catch (e) { /* defaults fine */ }
 
+  let engines = { yue2: false, acestep: false };
+  try {
+    engines = await api.getEngines();
+  } catch (e) { /* both shown as unavailable */ }
+
+  // If the settings default engine isn't live, fall back to whichever is
+  const defaultEngine = settings.default_engine || 'acestep';
+  const chosen = engines[defaultEngine] ? defaultEngine
+    : engines.yue2 ? 'yue2'
+    : engines.acestep ? 'acestep'
+    : defaultEngine;  // nothing live: keep default so error surfacing is predictable
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Create</h1>
@@ -38,8 +50,8 @@ export async function renderCreateSimple(container) {
       <div class="row">
         <span class="row-label">Engine</span>
         <select class="form-select" id="create-engine" style="max-width: 240px;">
-          <option value="acestep" ${settings.default_engine !== 'yue2' ? 'selected' : ''}>ACE-Step (fast)</option>
-          <option value="yue2" ${settings.default_engine === 'yue2' ? 'selected' : ''}>YuE2 (high quality, slow)</option>
+          <option value="acestep" ${chosen === 'acestep' ? 'selected' : ''}>ACE-Step (fast)${engines.acestep ? '' : ' - offline'}</option>
+          <option value="yue2" ${chosen === 'yue2' ? 'selected' : ''}>YuE2 (high quality, slow)${engines.yue2 ? '' : ' - offline'}</option>
         </select>
       </div>
       <div class="row">

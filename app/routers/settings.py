@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -133,6 +135,18 @@ async def yue2_health():
     if not ok:
         return {"connected": False, "url": await yue2_svc.get_yue2_url()}
     return {"connected": True, "url": await yue2_svc.get_yue2_url()}
+
+
+@router.get("/engines")
+async def engine_availability():
+    """Which music engines are reachable right now."""
+    from app.services import yue2 as yue2_svc
+    from app.services import music as music_svc
+
+    yue2_ok, ace_ok = await asyncio.gather(
+        yue2_svc.health_check(), music_svc.health_check()
+    )
+    return {"yue2": yue2_ok, "acestep": ace_ok}
 
 
 @router.get("/version")

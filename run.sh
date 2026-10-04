@@ -64,9 +64,10 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM EXIT
 
-# Optionally start YuE2 (YuE2UI) on :7860 - opt-in, it's a heavy GPU server
-# with its own Python 3.12 venv inside the submodule.
-YUE2_ENABLED="${YUE2_ENABLED:-0}"
+# YuE2 (YuE2UI) on :7860 - auto-starts when its venv exists (installed via
+# ./install.sh --with-yue2). The server is quick to start; the model itself
+# lazy-loads on the first job. Disable with YUE2_ENABLED=0.
+YUE2_ENABLED="${YUE2_ENABLED:-1}"
 if [ "$YUE2_ENABLED" = "1" ]; then
     if [ -x "$ROOT/YuE2UI/.venv/bin/python" ]; then
         echo "Starting YuE2 (YuE2UI) on :7860..."
@@ -93,28 +94,37 @@ if [ "$YUE2_ENABLED" = "1" ]; then
             sleep 2
         done
     else
-        echo "WARNING: YuE2UI venv not found (./install.sh --with-yue2?). Continuing without YuE2."
+        echo "YuE2 not installed (./install.sh --with-yue2) - skipping. Continuing without it."
     fi
 fi
 
-# Start ACE-Step API on :8001
-echo "Starting ACE-Step API on :8001..."
-acestep-api --host 127.0.0.1 --port 8001 &
-ACESTEP_PID=$!
+# ACE-Step on :8001 - opt-in with ACESTEP_ENABLED=1. It loads its model at
+# startup, which is slow; use it when you specifically want ACE-Step renders
+# (also powers the lyrics /format endpoint).
+ACESTEP_ENABLED="${ACESTEP_ENABLED:-0}"
+ACESTEP_PID=""
+if [ "$ACESTEP_ENABLED" = "1" ]; then
+    # Start ACE-Step API on :8001
+    echo "Starting ACE-Step API on :8001..."
+    acestep-api --host 127.0.0.1 --port 8001 &
+    ACESTEP_PID=$!
 
-# Wait for ACE-Step health check
-echo "Waiting for ACE-Step to be ready..."
-for i in $(seq 1 60); do
-    if curl -sf http://127.0.0.1:8001/health &>/dev/null; then
-        echo "ACE-Step ready."
-        break
-    fi
-    if ! kill -0 "$ACESTEP_PID" 2>/dev/null; then
-        echo "ERROR: ACE-Step process died."
-        exit 1
-    fi
-    sleep 2
-done
+    # Wait for ACE-Step health check
+    echo "Waiting for ACE-Step to be ready..."
+    for i in $(seq 1 60); do
+        if curl -sf http://127.0.0.1:8001/health &>/dev/null; then
+            echo "ACE-Step ready."
+            break
+        fi
+        if ! kill -0 "$ACESTEP_PID" 2>/dev/null; then
+            echo "ERROR: ACE-Step process died."
+            exit 1
+        fi
+        sleep 2
+    done
+else
+    echo "ACE-Step disabled (ACESTEP_ENABLED=1 to enable)."
+fi
 
 # Start Squalus Shiraii on :8000
 echo "Starting Squalus Shiraii 🦈 on :8000..."
@@ -124,8 +134,8 @@ APP_PID=$!
 echo ""
 echo "=== Squalus Shiraii 🦈 running ==="
 echo "  App:      http://localhost:8000"
-echo "  ACE-Step: http://localhost:8001"
 [ -n "$YUE2_PID" ] && echo "  YuE2:     http://localhost:7860"
+[ -n "$ACESTEP_PID" ] && echo "  ACE-Step: http://localhost:8001"
 echo ""
 echo "Press Ctrl+C to stop."
 

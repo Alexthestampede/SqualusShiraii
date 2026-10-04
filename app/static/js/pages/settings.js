@@ -101,9 +101,10 @@ export async function renderSettings(container) {
         <div class="form-group mb-4">
           <label class="form-label">Default Engine</label>
           <select class="form-select" id="set-default-engine">
-            <option value="acestep" ${settings.default_engine !== 'yue2' ? 'selected' : ''}>ACE-Step</option>
             <option value="yue2" ${settings.default_engine === 'yue2' ? 'selected' : ''}>YuE2</option>
+            <option value="acestep" ${settings.default_engine !== 'yue2' ? 'selected' : ''}>ACE-Step</option>
           </select>
+          <span class="text-sm text-muted">ACE-Step is started with ACESTEP_ENABLED=1 (slow model load); YuE2 starts automatically when installed.</span>
         </div>
         <div class="form-group mb-4">
           <label class="form-label">ACE-Step API URL</label>

@@ -35,6 +35,7 @@ export const api = {
   createSimple: (data) => request('POST', '/api/create/simple', data),
   createCustom: (data) => request('POST', '/api/create/custom', data),
   checkYue2: () => request('GET', '/api/settings/yue2/health'),
+  getEngines: () => request('GET', '/api/settings/engines'),
 
   // Lyrics
   generateLyrics: (data) => request('POST', '/api/lyrics/generate', data),
