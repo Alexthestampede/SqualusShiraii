@@ -168,14 +168,14 @@ async def create_simple(body: dict, bg: BackgroundTasks, db: AsyncSession = Depe
     await db.commit()
 
     if engine == "yue2":
+        # Simple mode has no lyrics field - the LLM writes them in the worker
         yue_params = {
             "style": caption,
-            "lyrics": lyrics,
+            "lyrics": "",
             "cot": "full",
             "preview": True,
         }
-        # Simple mode has no real lyrics - have the LLM write them first
-        yue_params["generate_lyrics_from"] = description if not lyrics else ""
+        yue_params["generate_lyrics_from"] = description
         bg.add_task(_run_yue2_generation, job.id, song.id, yue_params)
         return {"job_id": job.id, "song_id": song.id}
 
@@ -263,6 +263,9 @@ async def create_custom(body: dict, bg: BackgroundTasks, db: AsyncSession = Depe
             "cot": "full",
             "preview": bool(body.get("preview", True)),
         }
+        # No lyrics written - fall back to LLM-generated ones from the caption
+        if not lyrics:
+            yue_params["generate_lyrics_from"] = effective_caption or "Untitled song"
         if song.seed is not None:
             yue_params["seed"] = song.seed
         bg.add_task(_run_yue2_generation, job.id, song.id, yue_params)
