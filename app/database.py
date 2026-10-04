@@ -19,8 +19,8 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         # Lightweight column migrations (create_all won't alter existing tables)
-        existing = (await conn.execute(text("PRAGMA table_info(songs)"))).scalars().all()
-        if "engine" not in existing:
+        cols = [r[1] for r in (await conn.execute(text("PRAGMA table_info(songs)"))).fetchall()]
+        if "engine" not in cols:
             await conn.execute(text(
                 "ALTER TABLE songs ADD COLUMN engine VARCHAR(32) DEFAULT 'acestep' NOT NULL"
             ))
